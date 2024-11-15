@@ -61,7 +61,7 @@ class DataModule(pl.LightningDataModule):
             self.prediction_template = "ft_token"
         if self.preset_key == "ft_cot":
             self.finetune_key = "zs_cot_{}".format(self.dataset_key)
-            self.prediction_template = "ft_cot_token"
+            self.prediction_template = "ft_cot_natural"
         for aug in [1, 2, 4, 8, 16, 32, 64]:
             if self.preset_key == "ft_cot_t70_{}aug".format(aug):
                 self.finetune_key = "zs_cot_t70_{}_{}aug".format(self.dataset_key, aug)

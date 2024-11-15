@@ -48,70 +48,193 @@ class Model(pl.LightningModule):
             kwargs["decoder_attention_mask"] = batch["decoder_attention_mask"]
         return self.model(**kwargs)["loss"]
 
-    # def validation_step(self, batch, batch_idx) -> Dict[str, torch.Tensor]:
-    #     """
-    #     Returns outputs in dictionary format, since it's the only way that seems to work with `all_gather`
-    #     """
-    #     if self.current_epoch < 2 and self.truncate_early:
-    #         max_length = 256
-    #     else:
-    #         max_length = self.max_length
-
-    #     if self.model_type == "encoder_decoder":
-    #         output = self.model.generate(batch["input_ids"], max_length=max_length).detach()
-    #     elif self.model_type == "decoder":
-    #         output = self.model.generate(batch["input_ids"], max_length=max_length,
-    #                                      pad_token_id=self.tokenizer.pad_token_id,
-    #                                      eos_token_id=self.tokenizer.eos_token_id).detach()
-    #     else:
-    #         raise NotImplementedError("model_type='{}' not supported".format(self.model_type))
-
-    #     return {
-    #         "sample_index": batch["sample_index"],
-    #         "input": batch["input_ids"],
-    #         "output": output,
-    #     }
-
-    def validation_step(self, batch, batch_idx) -> Dict[str, torch.Tensor]:
+    def validation_step_ori(self, batch, batch_idx) -> Dict[str, torch.Tensor]:
         """
-        Generates predictions one token at a time for each element in the batch.
+        Returns outputs in dictionary format, since it's the only way that seems to work with `all_gather`
         """
         if self.current_epoch < 2 and self.truncate_early:
             max_length = 256
         else:
             max_length = self.max_length
 
-        sample_indices = batch["sample_index"]
-        inputs = batch["input_ids"]
-        outputs = []
-
-        for i in range(inputs.size(0)):  # Process each input in the batch
-            input_ids = inputs[i].unsqueeze(0)  # Select one input at a time
-            generated_tokens = input_ids.clone()  # Initialize with the input sequence
-
-            # Generate tokens one-by-one until max_length is reached
-            for _ in range(max_length - input_ids.size(1)):
-                output_token = self.model.generate(generated_tokens, max_length=generated_tokens.size(1) + 1,
-                                                   pad_token_id=self.tokenizer.pad_token_id,
-                                                   eos_token_id=self.tokenizer.eos_token_id).detach()[:, -1:]
-                
-                # Append the new token to the sequence
-                generated_tokens = torch.cat((generated_tokens, output_token), dim=1)
-
-                # Stop if EOS token is generated
-                if output_token.item() == self.tokenizer.eos_token_id:
-                    break
-
-            outputs.append(generated_tokens)
-
-        # Stack outputs to ensure batch-wise consistency
-        outputs = torch.cat(outputs, dim=0)
+        if self.model_type == "encoder_decoder":
+            output = self.model.generate(batch["input_ids"], max_length=max_length).detach()
+        elif self.model_type == "decoder":
+            output = self.model.generate(batch["input_ids"], max_length=max_length,
+                                         pad_token_id=self.tokenizer.pad_token_id,
+                                         eos_token_id=self.tokenizer.eos_token_id).detach()
+        else:
+            raise NotImplementedError("model_type='{}' not supported".format(self.model_type))
 
         return {
-            "sample_index": sample_indices,
-            "input": inputs,
-            "output": outputs,
+            "sample_index": batch["sample_index"],
+            "input": batch["input_ids"],
+            "output": output,
         }
+    def validation_step_single_row(self, batch, batch_idx) -> Dict[str, torch.Tensor]:
+        """
+        Processes each row in the batch individually and returns outputs in dictionary format, 
+        since it's the only way that seems to work with `all_gather`.
+        """
+        if self.current_epoch < 2 and self.truncate_early:
+            max_length = 256
+        else:
+            max_length = self.max_length
+
+        # Initialize lists to store each sample's results
+        sample_indices = []
+        inputs = []
+        outputs = []
+
+        # Iterate through each row in the batch
+        for i in range(len(batch["input_ids"])):
+            input_ids = batch["input_ids"][i].unsqueeze(0)  # Add batch dimension
+
+            # Generate output based on model type
+            if self.model_type == "encoder_decoder":
+                padded_outputs = self.model.generate(input_ids, max_length=max_length).detach()
+            elif self.model_type == "decoder":
+                output = self.model.generate(
+                    input_ids,
+                    max_length=max_length,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id
+                ).detach()
+            else:
+                raise NotImplementedError(f"model_type='{self.model_type}' not supported")
+
+            # Append each result to the respective list
+            sample_indices.append(batch["sample_index"][i])
+            inputs.append(input_ids.squeeze(0))  # Remove batch dimension
+            outputs.append(output.squeeze(0))    # Remove batch dimension
+
+        max_output_length = max([output.size(0) for output in outputs])
+        padded_outputs = torch.stack(
+            [torch.nn.functional.pad(output, (0, max_output_length - output.size(0)),
+                                    value=self.tokenizer.pad_token_id) for output in outputs]
+        )
+
+        # Return a dictionary of results with padded outputs
+        return {
+            "sample_index": batch["sample_index"],
+            "input": batch["input_ids"],
+            "output": padded_outputs,
+        }
+
+    def validation_step_single_token(self, batch, batch_idx) -> Dict[str, torch.Tensor]:
+        """
+        Processes each row in the batch individually and returns outputs in dictionary format, 
+        since it's the only way that seems to work with `all_gather`.
+        """
+        if self.current_epoch < 2 and self.truncate_early:
+            max_length = 128
+        else:
+            max_length = self.max_length
+
+        # Initialize lists to store each sample's results
+        sample_indices = []
+        inputs = []
+        outputs = []
+
+        # Iterate through each row in the batch
+        if self.model_type == "encoder_decoder":
+            for i in range(len(batch["input_ids"])):
+                input_ids = batch["input_ids"][i].unsqueeze(0)  # Add batch dimension
+                attention_mask = batch["attention_mask"][i].unsqueeze(0)
+                B, _ = input_ids.size()
+                labels = torch.zeros(B, 1, dtype=torch.long, device=input_ids.device)
+                encoder_outputs = None
+                for _ in range(max_length):
+                    out = self.model.forward(
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
+                        decoder_input_ids=labels,
+                    )
+                    top_labels = out.logits[:, -1].argmax(-1).unsqueeze(-1)
+                    labels = torch.cat([labels, top_labels], dim=-1)
+                    if top_labels.item() == self.eos_token_id:
+                        break
+                outputs.append(labels)
+            
+            max_output_length = max([output.size(0) for output in outputs])
+            padded_outputs = torch.stack(
+                [torch.nn.functional.pad(output, (0, max_output_length - output.size(0)),
+                                        value=self.tokenizer.pad_token_id) for output in outputs]
+            )
+            # output = self.model.generate(batch["input_ids"], max_length=max_length).detach()
+        elif self.model_type == "decoder":
+            padded_outputs = self.model.generate(batch["input_ids"], max_length=max_length,
+                                         pad_token_id=self.tokenizer.pad_token_id,
+                                         eos_token_id=self.tokenizer.eos_token_id).detach()
+        else:
+            raise NotImplementedError("model_type='{}' not supported".format(self.model_type))
+
+        return {
+            "sample_index": batch["sample_index"],
+            "input": batch["input_ids"],
+            "output": padded_outputs,
+        }
+
+    def validation_step(self, batch, batch_idx) -> Dict[str, torch.Tensor]:
+        """
+        Generates predictions one token at a time for each element in the batch.
+        """
+
+        return self.validation_step_ori(batch, batch_idx)
+        
+        # if self.current_epoch < 2 and self.truncate_early:
+        #     max_length = 128
+        # else:
+        #     max_length = self.max_length
+
+        # sample_indices = batch["sample_index"]
+        # inputs = batch["input_ids"]
+        # outputs = []
+
+        # for i in range(inputs.size(0)):  # Process each input in the batch
+        #     input_ids = inputs[i].unsqueeze(0)  # Select one input at a time
+        #     generated_tokens = input_ids.clone()  # Initialize with the input sequence
+        #     # Generate tokens one-by-one until max_length is reached
+        #     # print("max_length - input_ids.size(1):", max_length - input_ids.size(1))
+        #     for j in range(max_length - input_ids.size(1)):
+        #         # print('i, j', i, j)
+        #         output_token = self.model.generate(generated_tokens, max_length=generated_tokens.size(1) + 1,
+        #                                            pad_token_id=self.tokenizer.pad_token_id,
+        #                                            eos_token_id=self.tokenizer.eos_token_id).detach()
+        #         # print('output_token', output_token.shape)
+        #         output_token = output_token[:, -1:]
+        #         # print('output_token', output_token.shape)
+        #         # Append the new token to the sequence
+        #         generated_tokens = torch.cat((generated_tokens, output_token), dim=1)
+
+        #         # Stop if EOS token is generated
+        #         if output_token.item() == self.tokenizer.eos_token_id:
+        #             break
+        #     outputs.append(generated_tokens)
+
+        # # Stack outputs to ensure batch-wise consistency
+        # max_generated_length = max([gen.size(1) for gen in outputs])
+
+        # # Pad each sequence in outputs to the max_generated_length
+        # padded_outputs = []
+        # for gen in outputs:
+        #     padding_length = max_generated_length - gen.size(1)
+        #     if padding_length > 0:
+        #         pad_token_id = self.tokenizer.pad_token_id
+        #         padding = torch.full((1, padding_length), pad_token_id, dtype=torch.long, device=gen.device)
+        #         gen = torch.cat((gen, padding), dim=1)
+        #     padded_outputs.append(gen)
+
+        # # Stack padded outputs to ensure batch-wise consistency
+        # outputs = torch.cat(padded_outputs, dim=0)
+        # # print('OUTPUT', type(outputs), outputs.shape)
+        # # print(outputs)
+        # return {
+        #     "sample_index": sample_indices,
+        #     "input": inputs,
+        #     "output": outputs,
+        # }
+
 
     def validation_epoch_end(self, outputs: List[Dict]) -> None:
         """
