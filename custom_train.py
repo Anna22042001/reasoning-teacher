@@ -105,7 +105,7 @@ if __name__ == "__main__":
         raise Exception("external_lightning_logs/ does not exist")
     default_root_dir = os.path.join("external_lightning_logs", "{}_{}_{}".format(model_key, dataset_key, train_key))
     trainer = pl.Trainer(accelerator="gpu", devices=args.devices, strategy=args.strategy,
-                         default_root_dir=default_root_dir, min_epochs=20, max_epochs=20,
+                         default_root_dir=default_root_dir, min_epochs=15, max_epochs=15,
                          accumulate_grad_batches=args.accumulate, precision=args.precision,
                          enable_checkpointing=args.enable_checkpointing)
 
