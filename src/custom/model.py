@@ -209,7 +209,7 @@ class Model(pl.LightningModule):
                     )
                     top_labels = out.logits[:, -1].argmax(-1).unsqueeze(-1)
                     labels = torch.cat([labels, top_labels], dim=-1)
-                    if top_labels.item() == self.eos_token_id:
+                    if top_labels.item() == self.tokenizer.eos_token_id:
                         break
                     if top_labels.item() in [784, 636]:
                         start = True
@@ -218,7 +218,7 @@ class Model(pl.LightningModule):
                     if start and end:
                         to_tool = self.tokenizer.decode(labels[0])
                         tool_doned = invoke_tools(text = to_tool)
-                        labels = self.tokenizer(tool_doned, return_tensors="pt")['input_ids'].to(input_ids.device)
+                        labels = self.tokenizer(tool_doned, return_tensors="pt")['input_ids'][:, :-1].to(input_ids.device)
                         start = False
                         end = False
 

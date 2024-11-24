@@ -86,6 +86,7 @@ def Calculator(input_query: str):
         '/': truediv
     }
     print('input_query', input_query)
+    input_query = input_query.replace(",", "")
     # Handle numbers directly (int or float)
     input_query = input_query.strip()
     if is_number(input_query):
@@ -122,10 +123,10 @@ def try_except(fn, callback = identity):
     @wraps(fn)
     def inner(args):
         print('args', args)
-        return fn(args)
         try:
             return fn(args)
         except Exception as e:
+            print(e)
             return callback(e)
     return inner
 

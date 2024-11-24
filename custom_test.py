@@ -45,11 +45,21 @@ if __name__ == "__main__":
 
     dataset_key = args.dataset_key
     model_key = args.model_key
-
+    from collections import OrderedDict
+    import torch
+    # Creating an empty OrderedDict
+    state_dict = OrderedDict()
+    checkpoint = torch.load('/content/reasoning-teacher/external_lightning_logs/flan_t5_base_addsub_ft_cot/lightning_logs/version_0/checkpoints/epoch=14-step=405.ckpt')
+    for k in checkpoint['state_dict'].keys():
+      if k.startswith('model.'):
+        state_dict[k[len('model.'):]] = checkpoint['state_dict'][k]
+      else:
+        state_dict[k] = checkpoint['state_dict'][k]
     if "flan" in model_key:
         hf_key = "google/{}".format(model_key.replace("_", "-"))
         model = AutoModelForSeq2SeqLM.from_pretrained(hf_key)
         tokenizer = AutoTokenizer.from_pretrained(hf_key, model_max_length=512)
+        model.load_state_dict(state_dict)
         model_type = "encoder_decoder"
         append_eos = False  # t5 tokenizers already append eos
     elif "t5" in model_key:
