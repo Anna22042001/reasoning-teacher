@@ -12,6 +12,7 @@ import pytorch_lightning as pl
 import torch
 from deepspeed.ops.adam import DeepSpeedCPUAdam
 from transformers import PreTrainedTokenizerBase
+from custom.utils import invoke_tools
 
 from data.completion_dataset import CompletionDataset, CompletionMetadata
 from data.dataset import Dataset
@@ -154,6 +155,74 @@ class Model(pl.LightningModule):
                     labels = torch.cat([labels, top_labels], dim=-1)
                     if top_labels.item() == self.eos_token_id:
                         break
+                    
+                outputs.append(labels)
+            
+            max_output_length = max([output.size(0) for output in outputs])
+            padded_outputs = torch.stack(
+                [torch.nn.functional.pad(output, (0, max_output_length - output.size(0)),
+                                        value=self.tokenizer.pad_token_id) for output in outputs]
+            )
+            # output = self.model.generate(batch["input_ids"], max_length=max_length).detach()
+        elif self.model_type == "decoder":
+            padded_outputs = self.model.generate(batch["input_ids"], max_length=max_length,
+                                         pad_token_id=self.tokenizer.pad_token_id,
+                                         eos_token_id=self.tokenizer.eos_token_id).detach()
+        else:
+            raise NotImplementedError("model_type='{}' not supported".format(self.model_type))
+
+        return {
+            "sample_index": batch["sample_index"],
+            "input": batch["input_ids"],
+            "output": padded_outputs,
+        }
+    def validation_step_single_token_tool(self, batch, batch_idx) -> Dict[str, torch.Tensor]:
+        """
+        Processes each row in the batch individually and returns outputs in dictionary format, 
+        since it's the only way that seems to work with `all_gather`.
+        """
+        if self.current_epoch < 2 and self.truncate_early:
+            max_length = 128
+        else:
+            max_length = self.max_length
+
+        # Initialize lists to store each sample's results
+        sample_indices = []
+        inputs = []
+        outputs = []
+
+        # Iterate through each row in the batch
+        if self.model_type == "encoder_decoder":
+            for i in range(len(batch["input_ids"])):
+                input_ids = batch["input_ids"][i].unsqueeze(0)  # Add batch dimension
+                attention_mask = batch["attention_mask"][i].unsqueeze(0)
+                B, _ = input_ids.size()
+                labels = torch.zeros(B, 1, dtype=torch.long, device=input_ids.device)
+                encoder_outputs = None
+                start = False
+                end = False
+                for _ in range(max_length):
+                    out = self.model.forward(
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
+                        decoder_input_ids=labels,
+                    )
+                    top_labels = out.logits[:, -1].argmax(-1).unsqueeze(-1)
+                    labels = torch.cat([labels, top_labels], dim=-1)
+                    if top_labels.item() == self.eos_token_id:
+                        break
+                    if top_labels.item() in [784, 636]:
+                        start = True
+                    elif top_labels.item() in [908, 4275, 908] and start:
+                        end = True
+                    if start and end:
+                        to_tool = self.tokenizer.decode(labels[0])
+                        tool_doned = invoke_tools(text = to_tool)
+                        labels = self.tokenizer(tool_doned, return_tensors="pt")['input_ids'].to(input_ids.device)
+                        start = False
+                        end = False
+
+                    
                 outputs.append(labels)
             
             max_output_length = max([output.size(0) for output in outputs])

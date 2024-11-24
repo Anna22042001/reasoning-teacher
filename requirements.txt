@@ -10,3 +10,4 @@ sentencepiece
 deepspeed
 scipy
 seaborn
+beartype
