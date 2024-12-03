@@ -85,26 +85,36 @@ def Calculator(input_query: str):
         '*': mul,
         '/': truediv
     }
-    print('input_query', input_query)
-    input_query = input_query.replace(",", "")
-    # Handle numbers directly (int or float)
-    input_query = input_query.strip()
+    input_query = input_query.replace(",", "").strip()
+
+    # Handle numbers directly
     if is_number(input_query):
         result = float(input_query)
         return int(result) if result.is_integer() else result
 
-    # Parse input with multiple operators
+    # Handle parentheses
+    while '(' in input_query or ')' in input_query:
+        # Find innermost parentheses
+        inner_expr = re.search(r'\([^()]*\)', input_query)
+        if inner_expr:
+            sub_expr = inner_expr.group(0)  # Get the matched parentheses
+            sub_result = Calculator(sub_expr[1:-1])  # Remove parentheses and evaluate
+            input_query = input_query.replace(sub_expr, str(sub_result), 1)
+        else:
+            raise ValueError("Mismatched parentheses in input")
+
+    # Parse input with operators
     for op in operators.keys():
         if op in input_query:
             parts = input_query.split(op, 1)  # Split on the first occurrence of the operator
             left = Calculator(parts[0].strip())
             right = Calculator(parts[1].strip())
-            print('operators', operators)
             result = operators[op](left, right)
-            print('result', result)
+            print(result)
             return int(result) if float(result).is_integer() else round(result, 2)
-    
+
     raise ValueError("Invalid input query")
+
 def exists(val):
     return val is not None
 
