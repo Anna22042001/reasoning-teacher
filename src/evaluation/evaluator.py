@@ -104,7 +104,7 @@ class Evaluator:
         return (answer, predictions) if return_all else answer
 
     def cleanse_answer(self, answer: str) -> str:
-        if self.dataset_key in ["gsm8k", "addsub", "multiarith", "svamp", "single_eq"]:
+        if self.dataset_key in ["gsm8k", "addsub", "multiarith", "svamp", "single_eq", "math_merge"]:
             answer = answer.replace(",", "")
         if self.dataset_key == "strategy_qa":
             answer = answer.lower()
@@ -124,10 +124,10 @@ class Evaluator:
             prediction = re.findall(r'[ABCDEF]', prediction)
         elif self.dataset_key in ("tracking_shuffled_objects"):
             prediction = re.findall(r'[ABC]', prediction)
-        elif self.dataset_key in ("gsm8k", "addsub", "multiarith", "svamp", "single_eq"):
+        elif self.dataset_key in ("gsm8k", "addsub", "multiarith", "svamp", "single_eq", "math_merge"):
             prediction = prediction.replace(",", "")
             prediction = re.findall(r'-?\d+(?:\.\d+)?', prediction)
-            if self.dataset_key in ("addsub", "svamp", "single_eq"):
+            if self.dataset_key in ("addsub", "svamp", "single_eq", "math_merge"):
                 prediction = [float(s) for s in prediction]
         elif self.dataset_key in ("strategy_qa", "coin_flip"):
             prediction = prediction.lower()
@@ -143,7 +143,7 @@ class Evaluator:
         return prediction
 
     def _compare_prediction_and_answer(self, prediction, answer) -> bool:
-        if self.dataset_key in ("addsub", "svamp", "single_eq"):
+        if self.dataset_key in ("addsub", "svamp", "single_eq", "math_merge"):
             return prediction is not None and abs(prediction - answer) <= 1e-6
         else:
             return prediction is not None and prediction == answer

@@ -30,7 +30,7 @@ DATASET_SIZES = {
     "gsm8k": 8792,
     "aqua": 97721,
     "svamp": 1000,
-
+    "math_merge": 1503,
     "tracking_shuffled_objects": 750,
     "date_understanding": 369,
     "coin_flip": 500,
