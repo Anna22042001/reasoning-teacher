@@ -1,21 +1,42 @@
 # Large Language Models Are Reasoning Teachers
 
-## Modifications to use tools
+## Instructions to Replicate Our Results (Team 04)
 
-New implementation saved in ./calculator 
+To replicate the results of the original paper, please follow the instructions below (starting after the "Getting Started" section).
 
+### Our New Implementation Includes:
 
+1. **Fine-tuning Data Preparation**
+   - **Script:** `./reasoning-teacher/calculator/create_fine_tuning_with_calculator.py`
+   - **Purpose:** Replaces all mathematical operations with calculator calls to construct new fine-tuning data for small models.
+   - **Usage:** Requires the `file_path` to the file containing the original reasoning steps produced by the teacher models (e.g., `./D_multiarith.json` for the MultiArith dataset).
 
-Official repository for [Large Language Models Are Reasoning Teachers](https://arxiv.org/abs/2212.10071), by
+2. **Inference Function Processing**
+   - **File:** `./reasoning-teacher/src/custom/utils.py`
+   - **Purpose:** Processes function calls during inference (e.g., converting `Calculator(1+5*3+16/4)` into `20`).
+
+3. **New Inference Code for Validation**
+   - **Function:** `def validation_step_single_token_tool()` (located in `./reasoning-teacher/src/custom/model.py`)
+   - **Purpose:** Enables function calling during validation. This function is only used within `def validation_step()` from the same file when running `./reasoning-teacher/scripts/custom/example_ft5_test.sh`.
+   - **Note:** During training, the original inference function (`def validation_step_ori()`) is still used.
+
+4. **Note**
+   - **Running `example_ft5_test.sh`:** When running the test files after fine-tuning, the path to the checkpoint must be modified to match the dataset used. For example:
+     ```python
+     checkpoint = torch.load('/content/reasoning-teacher/external_lightning_logs/flan_t5_base_addsub_ft_cot/lightning_logs/version_0/checkpoints/epoch=14-step=405.ckpt')
+     ```
+     This example uses a checkpoint for `flan-t5-base` fine-tuned on the AddSub dataset.
+   - Unlike the training script (`./reasoning-teacher/scripts/custom/example_ft5.sh`), which can handle multiple datasets, the test script (`./reasoning-teacher/scripts/custom/example_ft5_test.sh`) can only be run for one dataset (corresponding to a specific checkpoint) at a time.
+   - The notebook to ran the whole training and inference pipeline on Google Colab is at `./reasoning-teacher/reasoning.ipynb`
+   - We added three fine-tuning datasets (in both the original and augmented with calculator calls versions) used in our project (AddSub, MultiArith, SingleEq) under `./reasoning-teacher/calculator/`, so those datasets could be directly used for fine-tuning
+  
+The original work is [Large Language Models Are Reasoning Teachers](https://arxiv.org/abs/2212.10071), by
 Namgyu Ho, Laura Schmid, and Se-young Yun.
-
-**🚀 Accepted to ACL 2023.**
-
-This repository contains code for (1) running CoT reasoning on OpenAI models,
-and (2) apply Fine-tune-CoT to train students based on OpenAI models *or* custom open-source models such as T5, Flan-T5, GPT-2 on your GPUs, based on 🤗 and Pytorch Lightning.
 
 
 ## Getting Started
+This repository contains code for (1) running CoT reasoning on OpenAI models,
+and (2) apply Fine-tune-CoT to train students based on OpenAI models *or* custom open-source models such as T5, Flan-T5, GPT-2 on your GPUs, based on 🤗 and Pytorch Lightning.
 
 ### OpenAI API Experiments
 

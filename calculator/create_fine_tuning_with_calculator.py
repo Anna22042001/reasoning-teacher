@@ -107,7 +107,7 @@ for i, (key, samples) in enumerate(data['data'].items()):
 
 
 
-file_path_copied = "./teacher_completion_data/B_text-davinci-002__C_zs_cot/D_multiarith_copied.json"
+file_path_augmented = "./teacher_completion_data/B_text-davinci-002__C_zs_cot/D_multiarith_augmented.json"
 with open(file_path_copied, 'w') as file:
     json.dump(copied_data, file, indent=4)
 

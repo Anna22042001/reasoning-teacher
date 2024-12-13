@@ -248,61 +248,9 @@ class Model(pl.LightningModule):
         """
         Generates predictions one token at a time for each element in the batch.
         """
-
+        # return self.validation_step_single_token_tool(batch, batch_idx)
         return self.validation_step_ori(batch, batch_idx)
         
-        # if self.current_epoch < 2 and self.truncate_early:
-        #     max_length = 128
-        # else:
-        #     max_length = self.max_length
-
-        # sample_indices = batch["sample_index"]
-        # inputs = batch["input_ids"]
-        # outputs = []
-
-        # for i in range(inputs.size(0)):  # Process each input in the batch
-        #     input_ids = inputs[i].unsqueeze(0)  # Select one input at a time
-        #     generated_tokens = input_ids.clone()  # Initialize with the input sequence
-        #     # Generate tokens one-by-one until max_length is reached
-        #     # print("max_length - input_ids.size(1):", max_length - input_ids.size(1))
-        #     for j in range(max_length - input_ids.size(1)):
-        #         # print('i, j', i, j)
-        #         output_token = self.model.generate(generated_tokens, max_length=generated_tokens.size(1) + 1,
-        #                                            pad_token_id=self.tokenizer.pad_token_id,
-        #                                            eos_token_id=self.tokenizer.eos_token_id).detach()
-        #         # print('output_token', output_token.shape)
-        #         output_token = output_token[:, -1:]
-        #         # print('output_token', output_token.shape)
-        #         # Append the new token to the sequence
-        #         generated_tokens = torch.cat((generated_tokens, output_token), dim=1)
-
-        #         # Stop if EOS token is generated
-        #         if output_token.item() == self.tokenizer.eos_token_id:
-        #             break
-        #     outputs.append(generated_tokens)
-
-        # # Stack outputs to ensure batch-wise consistency
-        # max_generated_length = max([gen.size(1) for gen in outputs])
-
-        # # Pad each sequence in outputs to the max_generated_length
-        # padded_outputs = []
-        # for gen in outputs:
-        #     padding_length = max_generated_length - gen.size(1)
-        #     if padding_length > 0:
-        #         pad_token_id = self.tokenizer.pad_token_id
-        #         padding = torch.full((1, padding_length), pad_token_id, dtype=torch.long, device=gen.device)
-        #         gen = torch.cat((gen, padding), dim=1)
-        #     padded_outputs.append(gen)
-
-        # # Stack padded outputs to ensure batch-wise consistency
-        # outputs = torch.cat(padded_outputs, dim=0)
-        # # print('OUTPUT', type(outputs), outputs.shape)
-        # # print(outputs)
-        # return {
-        #     "sample_index": sample_indices,
-        #     "input": inputs,
-        #     "output": outputs,
-        # }
 
 
     def validation_epoch_end(self, outputs: List[Dict]) -> None:
