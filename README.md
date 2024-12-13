@@ -29,6 +29,7 @@ To replicate the results of the original paper, please follow the instructions b
    - Unlike the training script (`./reasoning-teacher/scripts/custom/example_ft5.sh`), which can handle multiple datasets, the test script (`./reasoning-teacher/scripts/custom/example_ft5_test.sh`) can only be run for one dataset (corresponding to a specific checkpoint) at a time.
    - The notebook to ran the whole training and inference pipeline on Google Colab is at `./reasoning-teacher/reasoning.ipynb`
    - We added three fine-tuning datasets (in both the original and augmented with calculator calls versions) used in our project (AddSub, MultiArith, SingleEq) under `./reasoning-teacher/calculator/`, so those datasets could be directly used for fine-tuning
+   - All implementation is available at `https://github.com/Anna22042001/reasoning-teacher/tree/submit`
   
 The original work is [Large Language Models Are Reasoning Teachers](https://arxiv.org/abs/2212.10071), by
 Namgyu Ho, Laura Schmid, and Se-young Yun.
